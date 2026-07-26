@@ -1,0 +1,9 @@
+pandas>=2.0
+numpy>=1.24
+pyarrow>=14.0        # parquet I/O for intermediate stages
+pytest>=7.4          # tests/
+jupyter>=1.0          # notebooks/
+matplotlib>=3.7
+seaborn>=0.13
+plotly>=5.18           # interactive charts in the notebook
+ruff>=0.4              # linting (see .github/workflows/ci.yml)

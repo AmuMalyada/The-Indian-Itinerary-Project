@@ -1,0 +1,54 @@
+{
+  "name": "Indian Itinerary Executive",
+  "dataColors": [
+    "#0F172A",
+    "#334155",
+    "#10B981",
+    "#F59E0B",
+    "#0EA5E9",
+    "#E2E8F0",
+    "#F8FAFC",
+    "#64748B"
+  ],
+  "background": "#0F172A",
+  "foreground": "#F8FAFC",
+  "tableAccent": "#10B981",
+  "textClasses": {
+    "title": {
+      "fontSize": 24,
+      "fontFace": "Segoe UI Semibold",
+      "color": "#F8FAFC"
+    },
+    "header": {
+      "fontSize": 16,
+      "fontFace": "Segoe UI Semibold",
+      "color": "#F8FAFC"
+    },
+    "label": {
+      "fontSize": 12,
+      "fontFace": "Segoe UI",
+      "color": "#E2E8F0"
+    }
+  },
+  "visualStyles": {
+    "card": {
+      "*": {
+        "label": [{ "color": "#CBD5E1" }],
+        "value": [{ "color": "#F8FAFC" }],
+        "title": [{ "color": "#CBD5E1" }]
+      }
+    },
+    "slicer": {
+      "*": {
+        "label": [{ "color": "#F8FAFC" }],
+        "header": [{ "color": "#F8FAFC" }]
+      }
+    },
+    "shape": {
+      "*": {
+        "fill": [{ "color": "#111827" }],
+        "stroke": [{ "color": "#334155" }]
+      }
+    }
+  }
+}

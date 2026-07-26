@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pipeline-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: ruff check scripts/ tests/
+
+      - name: Run ETL pipeline
+        working-directory: scripts
+        run: python run_pipeline.py
+
+      - name: Run data quality tests
+        run: pytest tests/ -v
+
+      - name: Upload final dataset artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: final_dataset
+          path: final_dataset/
+          retention-days: 14

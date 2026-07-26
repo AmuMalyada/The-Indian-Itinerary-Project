@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = ["intermediate", "processed", "final_dataset", "raw_data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]  # long lines tolerated in SQL-adjacent/log strings
+
+[tool.ruff.lint.isort]
+known-first-party = ["common"]

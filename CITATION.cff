@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this dataset or pipeline, please cite it as below."
+title: "The Indian Itinerary Project: An Open Travel Intelligence Dataset"
+version: 1.0.0
+date-released: 2026-07-24
+type: dataset
+license: MIT
+authors:
+  - name: "The Indian Itinerary Project Contributors"
+references:
+  - type: dataset
+    title: "Top Indian Places to Visit"
+    notes: "Kaggle dataset, real attraction data"
+  - type: dataset
+    title: "India Temperature / Climate Data"
+    notes: "Kaggle dataset, real monthly climate data"
+  - type: dataset
+    title: "Expanded Indian Travel Destinations, Reviews, Users, and History"
+    notes: "Kaggle dataset, synthetic/generated practice data"
