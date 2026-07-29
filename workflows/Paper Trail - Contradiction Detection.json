@@ -1,0 +1,169 @@
+{
+  "name": "Paper Trail - Contradiction Detection",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "f2a5dbb4-8ec5-4b7d-b5cb-8d6dfcd8c61e",
+      "name": "When Called by Storage",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -64
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f41cc573-77d4-4b92-a441-1d9052a49329",
+      "name": "When clicking Execute",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT paper_id, topic, year, stance, authors_normalized FROM papers;",
+        "options": {}
+      },
+      "id": "db994aa8-f8c4-4991-9cad-3999f36cbd87",
+      "name": "Read All Papers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "credentials": {
+        "postgres": {
+          "name": "Paper Trail PostgreSQL"
+        }
+      },
+      "position": [
+        224,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Group papers by (topic, author), sort chronologically, compare adjacent\n// stances, and emit one contradiction record whenever the stance changes.\n\nconst rows = $input.all()\n  .map((i) => i.json)\n  .filter((r) => r && Object.keys(r).length > 0);\n\n// Normalize authors_normalized into an array of author names.\nfunction parseAuthors(val) {\n  if (Array.isArray(val)) return val;\n  if (typeof val === 'string' && val.trim() !== '') {\n    try {\n      const parsed = JSON.parse(val);\n      if (Array.isArray(parsed)) return parsed;\n      return [val];\n    } catch (e) {\n      return [val];\n    }\n  }\n  return [];\n}\n\n// Build groups keyed by topic + author.\nconst groups = {};\nconst authorSet = new Set();\nlet papers_checked = 0;\n\nfor (const r of rows) {\n  papers_checked++;\n  const topic = r.topic != null ? String(r.topic) : '';\n  const authors = parseAuthors(r.authors_normalized);\n\n  for (const author of authors) {\n    const a = String(author).trim();\n    if (a === '') continue;\n    authorSet.add(a);\n    const key = topic + '||' + a;\n    if (!groups[key]) groups[key] = { topic, author: a, papers: [] };\n    groups[key].papers.push({\n      paper_id: r.paper_id != null ? String(r.paper_id) : null,\n      year: typeof r.year === 'number' ? r.year : (r.year != null ? Number(r.year) : null),\n      stance: r.stance != null ? String(r.stance) : null,\n    });\n  }\n}\n\nconst seen = new Set();\nconst contradictions = [];\n\nfor (const key of Object.keys(groups)) {\n  const g = groups[key];\n\n  // Sort chronologically; fall back to paper_id when years tie or are null.\n  const papers = g.papers.slice().sort((x, y) => {\n    const yx = x.year == null ? Infinity : x.year;\n    const yy = y.year == null ? Infinity : y.year;\n    if (yx !== yy) return yx - yy;\n    return String(x.paper_id).localeCompare(String(y.paper_id));\n  });\n\n  for (let i = 1; i < papers.length; i++) {\n    const earlier = papers[i - 1];\n    const later = papers[i];\n\n    // A contradiction event = the stance changed between adjacent papers.\n    if (!earlier.stance || !later.stance) continue;\n    if (earlier.stance === later.stance) continue;\n\n    // Dedup identical contradiction records.\n    const dedupKey = [\n      g.author, g.topic,\n      earlier.paper_id, earlier.year, earlier.stance,\n      later.paper_id, later.year, later.stance,\n    ].join('|');\n    if (seen.has(dedupKey)) continue;\n    seen.add(dedupKey);\n\n    contradictions.push({\n      json: {\n        author_or_lab: g.author,\n        topic: g.topic,\n        earlier_paper_id: earlier.paper_id,\n        earlier_year: earlier.year,\n        earlier_stance: earlier.stance,\n        later_paper_id: later.paper_id,\n        later_year: later.year,\n        later_stance: later.stance,\n      },\n    });\n  }\n}\n\n// Attach run-level counts to every emitted item so the summary node can read them.\nconst authors_checked = authorSet.size;\nconst contradictions_detected = contradictions.length;\n\nif (contradictions.length === 0) {\n  return [{\n    json: {\n      __no_contradictions: true,\n      contradictions_detected: 0,\n      authors_checked,\n      papers_checked,\n    },\n  }];\n}\n\nfor (const c of contradictions) {\n  c.json.__contradictions_detected = contradictions_detected;\n  c.json.__authors_checked = authors_checked;\n  c.json.__papers_checked = papers_checked;\n}\n\nreturn contradictions;"
+      },
+      "id": "20892f48-294b-469a-bbe0-ed55948d8a8a",
+      "name": "Detect Contradictions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO contradictions\n  (author_or_lab, topic, earlier_paper_id, earlier_year, earlier_stance, later_paper_id, later_year, later_stance)\nSELECT $1, $2, $3, $4, $5, $6, $7, $8\nWHERE $9 = 'true'\nON CONFLICT DO NOTHING;",
+        "options": {
+          "queryReplacement": "={{ $json.author_or_lab }},{{ $json.topic }},{{ $json.earlier_paper_id }},{{ $json.earlier_year }},{{ $json.earlier_stance }},{{ $json.later_paper_id }},{{ $json.later_year }},{{ $json.later_stance }},{{ $json.__no_contradictions ? \"false\" : \"true\" }}"
+        }
+      },
+      "id": "ea107e81-c1cc-4915-af61-c86f3ef18c93",
+      "name": "Store Contradictions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "credentials": {
+        "postgres": {
+          "name": "Paper Trail PostgreSQL"
+        }
+      },
+      "position": [
+        672,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Read run-level counts from the detection node's output.\nconst detected = $('Detect Contradictions').all().map((i) => i.json);\nconst first = detected[0] || {};\n\nlet contradictions_detected = 0;\nlet authors_checked = 0;\nlet papers_checked = 0;\n\nif (first.__no_contradictions) {\n  contradictions_detected = first.contradictions_detected || 0;\n  authors_checked = first.authors_checked || 0;\n  papers_checked = first.papers_checked || 0;\n} else {\n  contradictions_detected = first.__contradictions_detected || detected.length;\n  authors_checked = first.__authors_checked || 0;\n  papers_checked = first.__papers_checked || 0;\n}\n\nreturn [{ json: { contradictions_detected, authors_checked, papers_checked } }];"
+      },
+      "id": "cb20da47-9fc1-4d5a-a065-b45b69abd5af",
+      "name": "Summarize Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking Execute": {
+      "main": [
+        [
+          {
+            "node": "Read All Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Storage": {
+      "main": [
+        [
+          {
+            "node": "Read All Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Papers": {
+      "main": [
+        [
+          {
+            "node": "Detect Contradictions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Contradictions": {
+      "main": [
+        [
+          {
+            "node": "Store Contradictions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Contradictions": {
+      "main": [
+        [
+          {
+            "node": "Summarize Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5c273ce5-e633-4003-9d40-ebddf7afc491",
+  "meta": {
+    "instanceId": "371cde6ca97f909679fe96b2449e46b56bd022e28afb7ce5746d08c657951e58"
+  },
+  "nodeGroups": [],
+  "id": "7g7LSXgiIfmOF5ML",
+  "tags": []
+}

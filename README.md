@@ -182,6 +182,29 @@ support a FastAPI REST layer, a vector-DB/RAG travel chatbot, and mobile
 clients — without a schema redesign. Full roadmap:
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
+## Paper Trail Automation (n8n)
+
+This repository also contains a modular n8n automation called Paper Trail
+for research-paper ingestion and contradiction analysis workflows. The current
+workflow assets are in [`workflows/`](workflows/) and are designed around a
+single orchestrator with child workflow isolation.
+
+### Workflow architecture
+
+- Master orchestrator: `Paper Trail - Master Pipeline`
+- Child workflows:
+    - `Paper Trail - Database Setup`
+    - `Paper Trail - Ingestion`
+    - `Paper Trail - Extraction`
+    - `Paper Trail - Validation`
+    - `Paper Trail - Storage`
+    - `Paper Trail - Contradiction Detection`
+    - `Paper Trail - Consensus Engine`
+    - `Paper Trail - Notifications`
+
+For current deployment status, environment requirements, credential setup,
+known issues, and release checklist, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ## License
 
 [MIT](LICENSE) — see also [`CITATION.cff`](CITATION.cff) if you use this dataset in research or a derivative project.

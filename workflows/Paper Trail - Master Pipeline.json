@@ -1,0 +1,749 @@
+{
+  "name": "Paper Trail - Master Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b7f47d35-5b8c-4e7d-9fd7-1a8b2df11111",
+      "name": "When clicking Execute",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ptDbSetupx9Lm2Q",
+          "cachedResultName": "Paper Trail - Database Setup"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "1946316d-f39a-4252-9d6c-8f895f9eb001",
+      "name": "Call Database Setup",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\ns.started_at = new Date().toISOString();\ns.papers_fetched = 0;\ns.papers_skipped = 0;\ns.papers_inserted = 0;\ns.validation_errors = [];\ns.contradictions = {};\ns.consensus = {};\ns.storage_error = null;\nreturn [{ json: { started_at: s.started_at } }];"
+      },
+      "id": "c4f6b2a9-7d11-4c5c-8c8e-2f6de5222222",
+      "name": "Init Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ua7bqfS7CcJ2v6Kp",
+          "cachedResultName": "Paper Trail - Ingestion"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "d1e2f3a4-7b8c-4d9e-8f10-333333333333",
+      "name": "Call Ingestion",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nconst items = $input.all().map((item) => item.json || {});\nconst papers = [];\n\nfor (const item of items) {\n  if (item.__summary === true) {\n    s.papers_fetched = Number(item.papers_fetched) || 0;\n    s.papers_skipped = Number(item.papers_skipped) || 0;\n    continue;\n  }\n  papers.push({ json: item });\n}\n\nreturn papers;"
+      },
+      "id": "e4f5a6b7-8c9d-4e0f-9012-444444444444",
+      "name": "Capture Ingestion Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "MwkXXAD1dfoYvjm5",
+          "cachedResultName": "Paper Trail - Extraction"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "f1a2b3c4-9d8e-4f11-aaaa-555555555555",
+      "name": "Call Extraction",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "kn8IdDML7bqN28Xx",
+          "cachedResultName": "Paper Trail - Validation"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "a1b2c3d4-9e8f-4g12-bbbb-666666666666",
+      "name": "Call Validation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nconst items = $input.all().map((item) => item.json || {});\n\nfor (const item of items) {\n  if (item.valid === false && Array.isArray(item.errors) && item.errors.length > 0) {\n    s.validation_errors.push({\n      paper_id: item.paper_id != null ? item.paper_id : null,\n      errors: item.errors,\n    });\n  }\n}\n\nreturn items.map((item) => ({ json: item }));"
+      },
+      "id": "b2c3d4e5-a9f0-4h13-cccc-777777777777",
+      "name": "Capture Validation Errors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jrZ25dBkvNS6mItX",
+          "cachedResultName": "Paper Trail - Storage"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "c3d4e5f6-b0a1-4i14-dddd-888888888888",
+      "name": "Call Storage",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1792,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nconst first = $input.first() ? ($input.first().json || {}) : {};\nconst hasCounts = first.papers_inserted !== undefined && first.papers_skipped !== undefined;\nconst storage_success = !first.error && hasCounts;\n\nif (storage_success) {\n  s.papers_inserted = Number(first.papers_inserted) || 0;\n  s.papers_skipped = Number(first.papers_skipped) || 0;\n  s.storage_error = null;\n} else {\n  s.storage_error = first.error ? (first.error.message || String(first.error)) : 'Storage failed or returned unexpected output';\n}\n\nreturn [{\n  json: {\n    ...first,\n    storage_success,\n    storage_error: s.storage_error,\n  },\n}];"
+      },
+      "id": "d4e5f6a7-b1c2-4j15-eeee-999999999999",
+      "name": "Capture Storage Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c650f466-026e-4a80-ab1c-1572d364e151",
+              "leftValue": "={{ $json.storage_success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0b8f0f4a-f749-49fb-abd0-f5d9b5bf1111",
+      "name": "Storage Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "7g7LSXgiIfmOF5ML",
+          "cachedResultName": "Paper Trail - Contradiction Detection"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "e5f6a7b8-c2d3-4k16-ffff-aaaaaaaaaaaa",
+      "name": "Call Contradiction Detection",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        -96
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nconst item = $input.first() ? ($input.first().json || {}) : {};\ns.contradictions = item;\nreturn [{ json: item }];"
+      },
+      "id": "f6a7b8c9-d3e4-4l17-bbbb-bbbbbbbbbbbb",
+      "name": "Capture Contradiction Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "0JoIkEczqBT5YUXg",
+          "cachedResultName": "Paper Trail - Consensus Engine"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "a7b8c9d0-e4f5-4m18-cccc-cccccccccccc",
+      "name": "Call Consensus Engine",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2912,
+        -96
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nconst item = $input.first() ? ($input.first().json || {}) : {};\ns.consensus = item;\n\nconst started = new Date(s.started_at || new Date().toISOString());\nconst finished = new Date();\nconst duration_ms = Math.max(finished.getTime() - started.getTime(), 0);\n\nreturn [{\n  json: {\n    message: `Paper Trail run completed in ${Math.round(duration_ms / 1000)}s`,\n    summary: {\n      papers_fetched: s.papers_fetched || 0,\n      papers_skipped: s.papers_skipped || 0,\n      papers_inserted: s.papers_inserted || 0,\n      validation_errors: Array.isArray(s.validation_errors) ? s.validation_errors : [],\n      contradictions: s.contradictions || {},\n      consensus: s.consensus || {},\n      started_at: s.started_at || started.toISOString(),\n      finished_at: finished.toISOString(),\n      duration_ms,\n    },\n  },\n}];"
+      },
+      "id": "b8c9d0e1-f5a6-4n19-dddd-dddddddddddd",
+      "name": "Build Notification Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3136,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nconst started = new Date(s.started_at || new Date().toISOString());\nconst finished = new Date();\nconst duration_ms = Math.max(finished.getTime() - started.getTime(), 0);\n\nreturn [{\n  json: {\n    message: 'Paper Trail run ended with storage failure. Analytics were skipped.',\n    summary: {\n      papers_fetched: s.papers_fetched || 0,\n      papers_skipped: s.papers_skipped || 0,\n      papers_inserted: s.papers_inserted || 0,\n      validation_errors: Array.isArray(s.validation_errors) ? s.validation_errors : [],\n      storage_error: s.storage_error || 'Unknown storage error',\n      analytics_skipped: true,\n      started_at: s.started_at || started.toISOString(),\n      finished_at: finished.toISOString(),\n      duration_ms,\n    },\n  },\n}];"
+      },
+      "id": "71dd705c-7d2f-4fd4-b8eb-8de6e4961222",
+      "name": "Build Storage Failure Notification Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "a7d1a2b3-c4d5-4e6f-8a90-1b2c3d4e5f60",
+          "cachedResultName": "Paper Trail - Notifications"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "c9d0e1f2-a6b7-4o20-eeee-eeeeeeeeeeee",
+      "name": "Call Notifications",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3360,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nconst started = new Date(s.started_at || new Date().toISOString());\nconst finished = new Date();\nconst duration_ms = Math.max(finished.getTime() - started.getTime(), 0);\n\nreturn [{\n  json: {\n    started_at: started.toISOString(),\n    finished_at: finished.toISOString(),\n    papers_fetched: Number(s.papers_fetched) || 0,\n    papers_inserted: Number(s.papers_inserted) || 0,\n    papers_skipped: Number(s.papers_skipped) || 0,\n    validation_errors: JSON.stringify(Array.isArray(s.validation_errors) ? s.validation_errors : []),\n    duration_ms,\n    run_summary: {\n      papers_fetched: Number(s.papers_fetched) || 0,\n      papers_inserted: Number(s.papers_inserted) || 0,\n      papers_skipped: Number(s.papers_skipped) || 0,\n      validation_errors: Array.isArray(s.validation_errors) ? s.validation_errors : [],\n      contradictions: s.contradictions || {},\n      consensus: s.consensus || {},\n      storage_error: s.storage_error || null,\n      duration_ms,\n    },\n  },\n}];"
+      },
+      "id": "d0e1f2a3-b7c8-4p21-ffff-ffffffffffff",
+      "name": "Build Run Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3584,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pipeline_runs\n  (started_at, finished_at, papers_fetched, papers_inserted, papers_skipped, validation_errors, duration_ms)\nVALUES ($1, $2, $3, $4, $5, $6, $7);",
+        "options": {
+          "queryReplacement": "={{ $json.started_at }},{{ $json.finished_at }},{{ $json.papers_fetched }},{{ $json.papers_inserted }},{{ $json.papers_skipped }},{{ $json.validation_errors }},{{ $json.duration_ms }}"
+        }
+      },
+      "id": "e1f2a3b4-c8d9-4q22-aaaa-121212121212",
+      "name": "Log Pipeline Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "credentials": {
+        "postgres": {
+          "name": "Paper Trail PostgreSQL"
+        }
+      },
+      "position": [
+        3808,
+        0
+      ],
+      "alwaysOutputData": true,
+      "continueOnFail": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f95f0560-4d0d-4f95-80bd-a3395f95d9e2",
+              "leftValue": "={{ $json.error !== undefined }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5c342182-7d8f-4d2a-9a86-a70517868333",
+      "name": "Log Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4032,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const logItem = $input.first() ? ($input.first().json || {}) : {};\nconst summary = logItem.run_summary || {};\n\nreturn [{\n  json: {\n    message: 'Paper Trail completed, but pipeline run logging failed.',\n    summary: {\n      ...summary,\n      logging_error: logItem.error ? (logItem.error.message || String(logItem.error)) : 'Unknown logging error',\n    },\n  },\n}];"
+      },
+      "id": "7dfec0bb-37a9-4cb9-81c4-c4e9f92a7444",
+      "name": "Build Logging Failure Notification Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4256,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "a7d1a2b3-c4d5-4e6f-8a90-1b2c3d4e5f60",
+          "cachedResultName": "Paper Trail - Notifications"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null,
+          "schema": [],
+          "matchingColumns": []
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "id": "b89a4871-04e5-4fd1-afb7-8d1cabd5f4c4",
+      "name": "Call Notifications Fallback",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4480,
+        -96
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "b6c07fe6-57d4-4f74-a6cb-0f4de3a15df0",
+      "name": "Pipeline Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4704,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking Execute": {
+      "main": [
+        [
+          {
+            "node": "Call Database Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Database Setup": {
+      "main": [
+        [
+          {
+            "node": "Init Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Run": {
+      "main": [
+        [
+          {
+            "node": "Call Ingestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Capture Ingestion Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Ingestion Output": {
+      "main": [
+        [
+          {
+            "node": "Call Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Extraction": {
+      "main": [
+        [
+          {
+            "node": "Call Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Validation": {
+      "main": [
+        [
+          {
+            "node": "Capture Validation Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Validation Errors": {
+      "main": [
+        [
+          {
+            "node": "Call Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Storage": {
+      "main": [
+        [
+          {
+            "node": "Capture Storage Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Storage Summary": {
+      "main": [
+        [
+          {
+            "node": "Storage Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storage Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Call Contradiction Detection",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Storage Failure Notification Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Contradiction Detection": {
+      "main": [
+        [
+          {
+            "node": "Capture Contradiction Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Contradiction Summary": {
+      "main": [
+        [
+          {
+            "node": "Call Consensus Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Consensus Engine": {
+      "main": [
+        [
+          {
+            "node": "Build Notification Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notification Payload": {
+      "main": [
+        [
+          {
+            "node": "Call Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Storage Failure Notification Payload": {
+      "main": [
+        [
+          {
+            "node": "Call Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Notifications": {
+      "main": [
+        [
+          {
+            "node": "Build Run Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Log": {
+      "main": [
+        [
+          {
+            "node": "Log Pipeline Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Pipeline Run": {
+      "main": [
+        [
+          {
+            "node": "Log Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Failed?": {
+      "main": [
+        [
+          {
+            "node": "Build Logging Failure Notification Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pipeline Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Logging Failure Notification Payload": {
+      "main": [
+        [
+          {
+            "node": "Call Notifications Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Notifications Fallback": {
+      "main": [
+        [
+          {
+            "node": "Pipeline Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "12345678-90ab-cdef-1234-567890abcdef",
+  "meta": {
+    "instanceId": "371cde6ca97f909679fe96b2449e46b56bd022e28afb7ce5746d08c657951e58"
+  },
+  "nodeGroups": [],
+  "id": "c1f2e3d4-a5b6-47c8-9d0e-112233445566",
+  "tags": []
+}
