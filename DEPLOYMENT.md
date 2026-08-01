@@ -135,12 +135,13 @@ stages to ensure required schema components exist.
 - Milestone achieved: modular master-driven architecture was fully wired,
   child orchestration boundaries were enforced, and core workflows were
   published with required credentials and environment variable configuration.
-- Final end-to-end rerun confirmation should be repeated in a stable cloud
-  session if UI interruptions recur.
+- Master pipeline execution completed successfully after workflow input mapping
+  refresh on `Call Database Setup` and credential rebinding across child flows.
 
 ## Remaining Work
 
-1. Perform one clean master execution rerun in n8n Cloud and capture run ID.
-2. Add post-run evidence (screenshots/log snippets) to release notes.
-3. Add automated health checks for workflow credential presence.
+1. Add post-run evidence (run IDs, screenshots, and logs) to release notes.
+2. Add automated health checks for workflow credential presence.
+3. Add retry/error-routing hardening for intermittent n8n Cloud UI/runtime
+   interruptions.
 4. Optionally add local Docker-based n8n dev environment runbook.
