@@ -1,0 +1,138 @@
+
+name: Rewrite and Push Historical Authors
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type REWRITE-INDIAN-ITINERARY-MAIN'
+        required: true
+        type: string
+      expected_old_sha:
+        description: 'Exact current main commit SHA'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Validate authorization and branch state
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          EXPECTED_OLD_SHA: ${{ inputs.expected_old_sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$CONFIRMATION" != "REWRITE-INDIAN-ITINERARY-MAIN" ]; then
+            echo "Confirmation phrase does not match."
+            exit 1
+          fi
+
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "This workflow may only run on main."
+            exit 1
+          fi
+
+          ACTUAL_SHA=$(git rev-parse HEAD)
+
+          if [ "$ACTUAL_SHA" != "$EXPECTED_OLD_SHA" ]; then
+            echo "The checked-out SHA does not match your confirmation."
+            echo "Expected: $EXPECTED_OLD_SHA"
+            echo "Actual:   $ACTUAL_SHA"
+            exit 1
+          fi
+
+          REMOTE_SHA=$(git ls-remote origin refs/heads/main | cut -f1)
+
+          if [ "$REMOTE_SHA" != "$EXPECTED_OLD_SHA" ]; then
+            echo "Remote main has changed. Refusing to overwrite it."
+            exit 1
+          fi
+
+          echo "Authorization and branch checks passed."
+
+      - name: Install git-filter-repo
+        run: |
+          pipx install git-filter-repo
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Create emergency pre-rewrite bundle
+        run: |
+          git bundle create indian-itinerary-pre-push.bundle --all
+          git bundle verify indian-itinerary-pre-push.bundle
+
+      - name: Prepare identity mapping
+        run: |
+          cat > author-mailmap.txt <<'EOF'
+          Amukta Malyada <309342361+AmuMalyada@users.noreply.github.com> rajkalyanvbs <vbsrajkalyan@gmail.com>
+          Amukta Malyada <309342361+AmuMalyada@users.noreply.github.com> rajkalyan vbs <vbsrajkalyan@gmail.com>
+          Amukta Malyada <309342361+AmuMalyada@users.noreply.github.com> V B S Raj Kalyan <vbsrajkalyan@gmail.com>
+          EOF
+
+      - name: Rewrite historical identities
+        run: |
+          git filter-repo --force --mailmap author-mailmap.txt
+
+      - name: Verify rewritten history before push
+        run: |
+          set -euo pipefail
+
+          git log main --format='%H | %an <%ae> | %cn <%ce> | %aI | %cI | %s' > rewritten-history.txt
+
+          if grep -qi 'vbsrajkalyan@gmail.com' rewritten-history.txt; then
+            echo "Old Kalyan identity remains. Push cancelled."
+            exit 1
+          fi
+
+          NEW_AUTHOR_COUNT=$(git log main --format='%ae' | grep -Fxc '309342361+AmuMalyada@users.noreply.github.com' || true)
+
+          if [ "$NEW_AUTHOR_COUNT" -ne 6 ]; then
+            echo "Expected 6 rewritten historical authors; found $NEW_AUTHOR_COUNT."
+            exit 1
+          fi
+
+          if ! grep -Fq 'GitHub <noreply@github.com>' rewritten-history.txt; then
+            echo "GitHub system committer was not preserved."
+            exit 1
+          fi
+
+          echo "All six historical author identities verified."
+          echo "No old Kalyan email remains."
+          echo "GitHub system committer preserved."
+
+      - name: Restore remote and force-push main safely
+        env:
+          EXPECTED_OLD_SHA: ${{ inputs.expected_old_sha }}
+        run: |
+          set -euo pipefail
+
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+
+          git push \
+            --force-with-lease="refs/heads/main:${EXPECTED_OLD_SHA}" \
+            origin \
+            refs/heads/main:refs/heads/main
+
+          echo "Rewritten main successfully pushed."
+
+      - name: Upload emergency backup and verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indian-itinerary-final-rewrite-record
+          path: |
+            indian-itinerary-pre-push.bundle
+            rewritten-history.txt
+          if-no-files-found: warn
+          retention-days: 90
