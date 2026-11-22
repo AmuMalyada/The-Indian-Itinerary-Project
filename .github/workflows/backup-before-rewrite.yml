@@ -1,5 +1,5 @@
 
-name: Historical Author Audit
+name: Backup Before History Rewrite
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  audit:
+  backup:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,21 +17,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Record historical identities
+      - name: Create and verify Git bundle
         run: |
-          mkdir -p audit
+          git bundle create indian-itinerary-original.bundle --all
+          git bundle verify indian-itinerary-original.bundle
 
-          git log --all --format='%H | %an <%ae> | %cn <%ce> | %aI | %cI | %s' > audit/complete-history.txt
-
-          git log --all --format='%an <%ae>' | sort | uniq -c > audit/author-summary.txt
-
-          git log --all --format='%cn <%ce>' | sort | uniq -c > audit/committer-summary.txt
-
-          git for-each-ref --format='%(refname) %(objectname)' > audit/references.txt
-
-      - name: Upload audit report
+      - name: Upload original history backup
         uses: actions/upload-artifact@v4
         with:
-          name: indian-itinerary-author-audit
-          path: audit/
-          retention-days: 30
+          name: indian-itinerary-original-history
+          path: indian-itinerary-original.bundle
+          retention-days: 90
