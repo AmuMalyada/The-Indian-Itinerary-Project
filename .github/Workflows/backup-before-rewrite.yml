@@ -1,0 +1,30 @@
+
+name: Backup Before History Rewrite
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout complete Git history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and verify Git bundle
+        run: |
+          git bundle create indian-itinerary-original.bundle --all
+          git bundle verify indian-itinerary-original.bundle
+
+      - name: Upload original history backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: indian-itinerary-original-history
+          path: indian-itinerary-original.bundle
+          retention-days: 90
