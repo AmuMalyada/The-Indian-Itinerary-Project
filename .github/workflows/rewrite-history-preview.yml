@@ -1,0 +1,102 @@
+
+name: Rewrite History Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout complete repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-filter-repo
+        run: |
+          pipx install git-filter-repo
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify original history before rewriting
+        run: |
+          set -euo pipefail
+
+          OLD_AUTHOR_COUNT=$(git log --all --format='%ae' | grep -Fxc 'vbsrajkalyan@gmail.com' || true)
+
+          echo "Original commits with Kalyan's email: $OLD_AUTHOR_COUNT"
+
+          if [ "$OLD_AUTHOR_COUNT" -ne 6 ]; then
+            echo "ERROR: Expected exactly 6 original commits."
+            exit 1
+          fi
+
+          git log --all --format='%H | %an <%ae> | %cn <%ce> | %aI | %cI | %s' > /tmp/original-history.txt
+
+      - name: Prepare identity mapping
+        run: |
+          cat > /tmp/author-mailmap.txt <<'EOF'
+          Amukta Malyada <309342361+AmuMalyada@users.noreply.github.com> rajkalyanvbs <vbsrajkalyan@gmail.com>
+          Amukta Malyada <309342361+AmuMalyada@users.noreply.github.com> rajkalyan vbs <vbsrajkalyan@gmail.com>
+          Amukta Malyada <309342361+AmuMalyada@users.noreply.github.com> V B S Raj Kalyan <vbsrajkalyan@gmail.com>
+          EOF
+
+      - name: Rewrite identities locally
+        run: |
+          git filter-repo --force --mailmap /tmp/author-mailmap.txt
+
+      - name: Verify rewritten history
+        run: |
+          set -euo pipefail
+
+          mkdir -p preview
+
+          git log --all --format='%H | %an <%ae> | %cn <%ce> | %aI | %cI | %s' > preview/rewritten-history.txt
+
+          git log --all --format='%an <%ae>' | sort | uniq -c > preview/author-summary.txt
+
+          git log --all --format='%cn <%ce>' | sort | uniq -c > preview/committer-summary.txt
+
+          git for-each-ref --format='%(refname) %(objectname)' > preview/references.txt
+
+          if grep -qi 'vbsrajkalyan@gmail.com' preview/rewritten-history.txt; then
+            echo "ERROR: An old Kalyan identity remains."
+            exit 1
+          fi
+
+          NEW_AUTHOR_COUNT=$(git log --all --format='%ae' | grep -Fxc '309342361+AmuMalyada@users.noreply.github.com' || true)
+
+          if [ "$NEW_AUTHOR_COUNT" -ne 6 ]; then
+            echo "ERROR: Expected 6 rewritten original author identities; found $NEW_AUTHOR_COUNT."
+            exit 1
+          fi
+
+          if ! grep -Fq 'GitHub <noreply@github.com>' preview/rewritten-history.txt; then
+            echo "ERROR: Expected GitHub system committer was not found."
+            exit 1
+          fi
+
+          cp /tmp/original-history.txt preview/original-history.txt
+          cp /tmp/author-mailmap.txt preview/author-mailmap.txt
+
+          echo "Original Kalyan author identities rewritten: $NEW_AUTHOR_COUNT" > preview/verification.txt
+          echo "Old Kalyan email remaining: No" >> preview/verification.txt
+          echo "GitHub system committer preserved: Yes" >> preview/verification.txt
+          echo "Commit messages and timestamps: Preserved by filter-repo" >> preview/verification.txt
+          echo "Remote push performed: No" >> preview/verification.txt
+
+      - name: Create and verify preview bundle
+        run: |
+          git bundle create preview/indian-itinerary-rewritten-preview.bundle --all
+          git bundle verify preview/indian-itinerary-rewritten-preview.bundle
+
+      - name: Upload rewrite preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: indian-itinerary-rewrite-preview
+          path: preview/
+          retention-days: 30
