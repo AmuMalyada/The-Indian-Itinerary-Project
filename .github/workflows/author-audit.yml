@@ -1,0 +1,37 @@
+
+name: Historical Author Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout complete Git history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Record historical identities
+        run: |
+          mkdir -p audit
+
+          git log --all --format='%H | %an <%ae> | %cn <%ce> | %aI | %cI | %s' > audit/complete-history.txt
+
+          git log --all --format='%an <%ae>' | sort | uniq -c > audit/author-summary.txt
+
+          git log --all --format='%cn <%ce>' | sort | uniq -c > audit/committer-summary.txt
+
+          git for-each-ref --format='%(refname) %(objectname)' > audit/references.txt
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: indian-itinerary-author-audit
+          path: audit/
+          retention-days: 30
